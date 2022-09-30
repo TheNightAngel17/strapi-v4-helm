@@ -1,0 +1,110 @@
+{{- $releaseName := .Release.Name}}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "strapi-v4.fullname" . }}
+  labels:
+    {{- include "strapi-v4.labels" . | nindent 4 }}
+spec:
+  {{- if not .Values.autoscaling.enabled }}
+  replicas: {{ .Values.replicaCount }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "strapi-v4.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        {{- include "strapi-v4.selectorLabels" . | nindent 8 }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "strapi-v4.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: {{ .Chart.Name }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          env:
+            # additional env variables
+            {{- range $key, $val := .Values.env }}
+            - name: {{ $key }}
+              value: {{ $val | quote }}
+            {{- end}}
+            # additional secret env varaiables
+            {{- range $key, $val := .Values.env_secrets }}
+            - name: {{ $key }}
+              valueFrom:
+                secretKeyRef:
+                  key: {{ $key }}
+                  name: {{ $releaseName }}-secrets
+            {{- end}}
+            # set port for build
+            - name: "PORT"
+              value: {{ .Values.service.port | quote }}
+            # set database export value
+            - name: "DB"
+              value: "postgres"
+            # Database Env Variables
+            - name: "DATABASE_HOST"
+              value: {{ .Release.Name }}-postgresql.{{ .Release.Namespace }}.svc
+            - name: "DATABASE_NAME"
+              value: {{ .Values.postgresql.auth.database }}
+            - name: "DATABASE_USERNAME"
+              value: {{ .Values.postgresql.auth.username }}
+            - name: "DATABASE_PASSWORD"
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Release.Name }}-postgresql
+                  key: password
+          ports:
+            - name: http
+              containerPort: {{ .Values.service.port }}
+              protocol: TCP
+          livenessProbe:
+            httpGet:
+              path: /
+              port: http
+          readinessProbe:
+            httpGet:
+              path: /
+              port: http
+          volumeMounts:
+          - name: data
+            mountPath: /opt/app/public/uploads
+            subPath: uploads
+          - name: data
+            mountPath: /opt/app/src
+            subPath: src
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+      volumes:
+      - name: data
+        {{- if .Values.persistence.enabled }}
+        persistentVolumeClaim:
+          claimName: {{ if .Values.persistence.existingClaim }}{{ .Values.persistence.existingClaim }}{{- else }}{{ .Release.Name }}{{- end }}
+        {{- else }}
+        emptyDir: {}
+        {{- end }}
+
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
