@@ -53,3 +53,5 @@ sets persistent volume claim if enabled in `.Values.persistence.enabled`. Nothin
 
 ## `templates\secret.yaml`
 adds new secret dependency. loops through all `.Values.env_secrets` values and adds them to the secret dependency.
+
+testing readmechanges
