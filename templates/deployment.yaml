@@ -51,10 +51,9 @@ spec:
             # set port for build
             - name: "PORT"
               value: {{ .Values.service.port | quote }}
-            # set database export value
-            - name: "DB"
-              value: "postgres"
             # Database Env Variables
+            - name: "DATABASE_CLIENT"
+              value: "postgres"
             - name: "DATABASE_HOST"
               value: {{ .Release.Name }}-postgresql.{{ .Release.Namespace }}.svc
             - name: "DATABASE_NAME"
